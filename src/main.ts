@@ -5,23 +5,24 @@ import { ArgumentParseError, isTaggedError } from "./domain/errors.js";
 import { generateContract } from "./generator/generateContract.js";
 
 async function main(): Promise<void> {
-    const program = Effect.gen(function* () {
-        const cliOptions = yield* Effect.try({
-            try: () => parseArgs(process.argv.slice(2)),
-            catch: (cause) =>
-                isTaggedError(cause, "HelpRequested") ||
-                isTaggedError(cause, "ArgumentParseError")
-                    ? cause
-                    : new ArgumentParseError(`Invalid CLI input: ${String(cause)}`),
-        });
-
-        yield* generateContract(cliOptions);
+  // Parse CLI args at the edge, then hand control to the Effect program.
+  const program = Effect.gen(function* () {
+    const cliOptions = yield* Effect.try({
+      try: () => parseArgs(process.argv.slice(2)),
+      catch: (cause) =>
+        isTaggedError(cause, "HelpRequested") || isTaggedError(cause, "ArgumentParseError")
+          ? cause
+          : new ArgumentParseError(`Invalid CLI input: ${String(cause)}`),
     });
 
-    const handledProgram = program.pipe(Effect.catchAll(renderError));
+    yield* generateContract(cliOptions);
+  });
 
-    // runPromise is the boundary where we execute the lazy Effect program.
-    await Effect.runPromise(handledProgram);
+  // Centralize all user-facing failures in one interpreter.
+  const handledProgram = program.pipe(Effect.catchAll(renderError));
+
+  // runPromise is the boundary where we execute the lazy Effect program.
+  await Effect.runPromise(handledProgram);
 }
 
 void main();

@@ -34,4 +34,38 @@ describe("inferSchema", () => {
             ].join("\n")
         );
     });
+
+    it("quotes object keys that are not safe TypeScript identifiers", () => {
+        const result = inferSchema({
+            "user-name": "Ada",
+            "first name": "Ada",
+            class: "admin",
+            normalKey: 1,
+        });
+
+        expect(result).toBe(
+            [
+                "Schema.Struct({",
+                '  "user-name": Schema.String,',
+                '  "first name": Schema.String,',
+                '  "class": Schema.String,',
+                "  normalKey: Schema.Number,",
+                "})",
+            ].join("\n")
+        );
+    });
+
+    it("infers heterogeneous arrays as unions", () => {
+        const result = inferSchema([1, "a", true, null]);
+
+        expect(result).toBe(
+            "Schema.Array(Schema.Union(Schema.Number, Schema.String, Schema.Boolean, Schema.Null))"
+        );
+    });
+
+    it("deduplicates repeated array member schemas", () => {
+        const result = inferSchema([1, 2, 3]);
+
+        expect(result).toBe("Schema.Array(Schema.Number)");
+    });
 });
